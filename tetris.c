@@ -65,6 +65,37 @@ void place_piece()
   piece_y = 0;
 }
 
+int check_collision(int dx, int dy)
+{
+  for(int i=0; i<SHAPE_SIZE; i++)
+  {
+    for(int j=0; j<SHAPE_SIZE; j++)
+    {
+      if(current_piece[i][j])
+      {
+        int new_x = piece_x + j + dx;
+        int new_y = piece_y + i + dy;
+        if(new_x < 0 || new_x >= COLS || new_y >= ROWS || board[new_y][new_x])
+        {
+          return 1;
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+void drop_piece()
+{
+  if(!check_collision(0,1))
+  {
+    piece_y++;
+  }
+  else
+  {
+    place_piece();
+  }
+}
 
 int main()
 {
@@ -72,7 +103,7 @@ int main()
   while(1)
     {
       draw_board();
-      //drop_piece();
+      drop_piece();
       //clear_lines();
       int ch = getch();
       switch(ch)
