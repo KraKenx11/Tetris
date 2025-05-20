@@ -2,13 +2,20 @@
 #include <stdlib.h>
 #include <ncurses.h>
 #include <time.h>
+#include "tetris.h"
 
 #define ROWS 20
 #define COLS 10
 #define SHAPE_SIZE 4
+#define NUM_PIECES 7
 
 int board[ROWS][COLS] = {0};
 int piece_x = 3, piece_y = 0;
+int score = 0;
+int high_score = 0;
+int game_over = 0;
+time_t last_powerup_time = 0;
+
 int current_piece[SHAPE_SIZE][SHAPE_SIZE] =
   {
     {0, 1, 0, 0},
@@ -16,9 +23,59 @@ int current_piece[SHAPE_SIZE][SHAPE_SIZE] =
     {0, 1, 0, 0},
     {0, 1, 0, 0}
   };
-int score = 0;
-int high_score = 0;
-int game_over = 0;
+
+int tetrominoes[NUM_PIECES][SHAPE_SIZE][SHAPE_SIZE] = 
+{
+  // I
+  {
+    {0,1,0,0},
+    {0,1,0,0},
+    {0,1,0,0},
+    {0,1,0,0}
+  },
+  // O
+  {
+    {0,0,0,0},
+    {0,1,1,0},
+    {0,1,1,0},
+    {0,0,0,0}
+  },
+  // T
+  {
+    {0,0,0,0},
+    {1,1,1,0},
+    {0,1,0,0},
+    {0,0,0,0}
+  },
+  // S
+  {
+    {0,0,0,0},
+    {0,1,1,0},
+    {1,1,0,0},
+    {0,0,0,0}
+  },
+  // Z
+  {
+    {0,0,0,0},
+    {1,1,0,0},
+    {0,1,1,0},
+    {0,0,0,0}
+  },
+  // J
+  {
+    {0,1,0,0},
+    {0,1,0,0},
+    {1,1,0,0},
+    {0,0,0,0}
+  },
+  // L
+  {
+    {0,1,0,0},
+    {0,1,0,0},
+    {0,1,1,0},
+    {0,0,0,0}
+  }
+};
 
 void init_game()
 {
@@ -47,22 +104,22 @@ void draw_board()
 {
   clear();
   for(int i=0; i<ROWS; i++)
-    {
-      for(int j=0; j<COLS; j++)
-	{
-	  mvprintw(i, j*2, board[i][j] ? "[]" : " .");
-	}
-    }
+  {
+    for(int j=0; j<COLS; j++)
+	  {
+	    mvprintw(i, j*2, board[i][j] ? "[]" : " .");
+	  }
+  }
   for(int i=0; i<SHAPE_SIZE; i++)
-    {
-      for(int j=0; j<SHAPE_SIZE; j++)
-	    {
-        if(current_piece[i][j])
-        {
-          mvprintw(piece_y + i, (piece_x + j) * 2, "[]");
-        }
-	    }
-    }
+  {
+    for(int j=0; j<SHAPE_SIZE; j++)
+	  {
+      if(current_piece[i][j])
+      {
+        mvprintw(piece_y + i, (piece_x + j) * 2, "[]");
+      }
+	  }
+  }
   mvprintw(0, COLS * 2 + 2, "Score: %d", score);
   mvprintw(1, COLS * 2 + 2, "High Score: %d", high_score);
   if(game_over)
@@ -71,7 +128,26 @@ void draw_board()
     mvprintw(ROWS / 2 + 1, COLS, "===== Final score: %d", score);
     mvprintw(ROWS / 2 + 2, COLS, "===== Press any key to quit.");
   }
+  mvprintw(3, COLS * 2 + 2, "A / D: Move piece");
+  mvprintw(4, COLS * 2 + 2, "S: Make piece fall faster");
+  mvprintw(5, COLS * 2 + 2, "W: Rotate piece");
+  mvprintw(6, COLS * 2 + 2, "Q: Quit game");
+  mvprintw(8, COLS * 2 + 2, "E: Power-up - Clear random column (5 seconds cooldown!)");
   refresh();
+}
+
+void new_piece()
+{
+  int index = rand() % NUM_PIECES;
+  for(int i=0; i<SHAPE_SIZE; i++)
+  {
+    for(int j=0; j<SHAPE_SIZE; j++)
+    {
+      current_piece[i][j] = tetrominoes[index][i][j];
+    }
+    piece_x = 3;
+    piece_y = 0;
+  }
 }
 
 int check_collision(int dx, int dy)
@@ -97,15 +173,16 @@ int check_collision(int dx, int dy)
 void place_piece()
 {
   for(int i=0; i<SHAPE_SIZE; i++)
-    {
-      for(int j=0; j<SHAPE_SIZE; j++)
-	{
-	  if(current_piece[i][j])
-	    {
-	      board[piece_y + i][piece_x + j] = 1;
-	    }
-	}
-    }
+  {
+    for(int j=0; j<SHAPE_SIZE; j++)
+	  {
+      if(current_piece[i][j])
+      {
+        board[piece_y + i][piece_x + j] = 1;
+      }
+	  }
+  }
+  new_piece();
   piece_x = 3;
   piece_y = 0;
   if(check_collision(0,0))
@@ -185,45 +262,19 @@ void clear_lines()
   }
 }
 
-int main()
+int powerup_clear_random_col()
 {
-  init_game();
-  while(!game_over)
-    {
-      draw_board();
-      drop_piece();
-      clear_lines();
-      int ch = getch();
-      switch(ch)
-      {
-        case 'a': move_piece(-1, 0); break;
-        case 'd': move_piece(1, 0); break;
-        case 's': drop_piece(); break;
-        case 'w': rotate_piece(); break;
-        case 'q': game_over = 1; break;
-      }
-    }
-  draw_board();
-  timeout(-1);
-  getch();
-  if(score > high_score)
+  time_t current_time = time(NULL);
+  if(difftime(current_time, last_powerup_time) >= POWERUP_COOLDOWN)
   {
-    FILE *f = fopen("highscore.txt", "w");
-    if(f)
+    int col = rand() % COLS;
+    for(int i=0; i<ROWS; i++)
     {
-      fprintf(f, "%d", score);
-      if(fclose(f) != 0)
-      {
-        perror("Eroare inchidere fisier highscore.");
-        exit(-1);
-      }
+      board[i][col] = 0;
     }
-    else
-    {
-      perror("Eroare scriere highscore in fisier.");
-      exit(-1);
-    }
+    score = score + 50;
+    last_powerup_time = current_time;
+    return 1;
   }
-  endwin();
   return 0;
 }
